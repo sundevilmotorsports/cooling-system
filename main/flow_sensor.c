@@ -63,7 +63,7 @@ void flow_sensor_init() {
     s_pcnt_unit[FLOW_CHANNEL_1] = pcnt_unit_1;
     s_pcnt_unit[FLOW_CHANNEL_2] = pcnt_unit_2;
 
-    // channels - per unit
+    // channels - one per unit
     pcnt_chan_config_t chan_config_1 = {
         .edge_gpio_num = FLOW1_GPIO,
         .level_gpio_num = -1, // not using level
