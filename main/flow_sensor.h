@@ -26,10 +26,11 @@ void flow_sensor_init();
 // raw PCNT totalizer count for a channel
 int flow_sensor_get_count(flow_channel_t channel);
 
-// gets amount of times the pcnt unit has surpassed the limit - needeed for overall pulse count
+// gets amount of times the pcnt unit has surpassed the limit
+// extra since unit config has this enabled, but can verify with this
 uint32_t flow_sensor_get_overflow_count(flow_channel_t channel);
 
-// queue of flow_edge_event_t - one entry per pulse edge
+// timestamp queue one entry per pulse edge
 QueueHandle_t flow_sensor_get_edge_queue(void);
 
 #endif

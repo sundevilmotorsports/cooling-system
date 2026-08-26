@@ -13,7 +13,7 @@ void flow_calc_state_init(flow_calc_state_t *state);
 // process one pulse edge
 void flow_calc_process_edge(flow_calc_state_t *state, int64_t timestamp_us, float k_factor, int64_t min_period_us);
 
-// call periodically to check for timrouts
+// call periodically to check for timeouts
 void flow_calc_check_timeout(flow_calc_state_t *state, int64_t now_us, int64_t timeout_us);
 
 float flow_calc_get_rate(const flow_calc_state_t *state);

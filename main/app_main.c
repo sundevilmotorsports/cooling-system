@@ -30,7 +30,7 @@
 static flow_calc_state_t flow_state[2];
 static const float lpp = 20.0f; // pulses per liter 
 
-// processes data from queeue
+// processes data from queue
 void process_flow(void *arg) {
     flow_edge_event_t event;
 
@@ -39,7 +39,7 @@ void process_flow(void *arg) {
         if (xQueueReceive(flow_sensor_get_edge_queue(), &event, pdMS_TO_TICKS(100)) == pdTRUE) {
             flow_calc_process_edge(&flow_state[event.channel], event.timestamp_us, lpp, MIN_PERIOD_US);
             
-            // flow_sensor_get_count() includes overflow accumulation (flag_accum_count=1)
+            // flow_sensor_get_count() includes overflow accumulation
             float total_vol = flow_calc_get_volume(flow_sensor_get_count(event.channel), lpp);
             update_flow(event.channel, flow_calc_get_rate(&flow_state[event.channel]), total_vol);
         }
@@ -56,6 +56,6 @@ void app_main() {
     flow_calc_state_init(&flow_state[0]);
     flow_calc_state_init(&flow_state[1]);
 
-    // create task, no need for handle as nothing else interacts with it
+    // create task
     xTaskCreate(process_flow, "flow_processor", STACK_SIZE, NULL, FLOW_PROCESSOR_PRIORITY, NULL);
 }

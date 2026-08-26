@@ -21,7 +21,7 @@ static QueueHandle_t s_edge_queue = NULL;
 // overflow count to verify flag_accum_count (per unit)
 static volatile uint32_t s_overflow_count[2] = {0, 0};
 
-// increments overflow counter when limit is hit 
+// watch point event callback - increments overflow counter when limit is hit 
 static bool IRAM_ATTR pcnt_watch_cb(pcnt_unit_handle_t unit, const pcnt_watch_event_data_t *edata, void *user_ctx) {
     flow_channel_t channel = (flow_channel_t)(intptr_t)user_ctx;
     s_overflow_count[channel]++;
@@ -101,7 +101,6 @@ void flow_sensor_init() {
     // sets on_reach to the overflow count increment function
     pcnt_event_callbacks_t watch_cbs = { .on_reach = pcnt_watch_cb  };
     
-    // 
     ESP_ERROR_CHECK(pcnt_unit_register_event_callbacks(pcnt_unit_1, &watch_cbs, (void *)FLOW_CHANNEL_1));
     ESP_ERROR_CHECK(pcnt_unit_register_event_callbacks(pcnt_unit_2, &watch_cbs, (void *)FLOW_CHANNEL_2));
 
@@ -129,7 +128,7 @@ void flow_sensor_init() {
 
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
 
-    // ensures functions run when triggered on specific gpios
+    // ensures functions run when triggered on specified gpios
     ESP_ERROR_CHECK(gpio_isr_handler_add(FLOW1_GPIO, flow_edge_isr, (void *)FLOW_CHANNEL_1));
     ESP_ERROR_CHECK(gpio_isr_handler_add(FLOW2_GPIO, flow_edge_isr, (void *)FLOW_CHANNEL_2));
 }
