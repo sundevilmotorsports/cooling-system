@@ -51,7 +51,7 @@ void flow_sensor_init() {
     pcnt_unit_config_t unit_cfg = { 
         .low_limit =  -32768,  // backward flow
         .high_limit = 32767,   // forward flow
-        .flag_accum_count = 1  // accumulates count after resetting due to limit
+        .flags.accum_count = 1  // accumulates count after resetting due to limit
     };
 
     // create new units - two flow channels
@@ -91,14 +91,17 @@ void flow_sensor_init() {
     pcnt_channel_set_edge_action(pcnt_chan_2, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_HOLD);
 
     // watch points to track when pulse count surpasses limits
+    // little bit extra since flag_accum_count is enabled, but can use to verify overflow amount is correct
     ESP_ERROR_CHECK(pcnt_unit_add_watch_point(pcnt_unit_1, 32767));
     ESP_ERROR_CHECK(pcnt_unit_add_watch_point(pcnt_unit_1, -32768));
     ESP_ERROR_CHECK(pcnt_unit_add_watch_point(pcnt_unit_2, 32767));
     ESP_ERROR_CHECK(pcnt_unit_add_watch_point(pcnt_unit_2, -32768));
 
     // overflow verification
+    // sets on_reach to the overflow count increment function
     pcnt_event_callbacks_t watch_cbs = { .on_reach = pcnt_watch_cb  };
     
+    // 
     ESP_ERROR_CHECK(pcnt_unit_register_event_callbacks(pcnt_unit_1, &watch_cbs, (void *)FLOW_CHANNEL_1));
     ESP_ERROR_CHECK(pcnt_unit_register_event_callbacks(pcnt_unit_2, &watch_cbs, (void *)FLOW_CHANNEL_2));
 

@@ -39,7 +39,7 @@ void process_flow(void *arg) {
         if (xQueueReceive(flow_sensor_get_edge_queue(), &event, pdMS_TO_TICKS(100)) == pdTRUE) {
             flow_calc_process_edge(&flow_state[event.channel], event.timestamp_us, lpp, MIN_PERIOD_US);
             
-            // 
+            // flow_sensor_get_count() includes overflow accumulation (flag_accum_count=1)
             float total_vol = flow_calc_get_volume(flow_sensor_get_count(event.channel), lpp);
             update_flow(event.channel, flow_calc_get_rate(&flow_state[event.channel]), total_vol);
         }

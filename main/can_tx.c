@@ -5,6 +5,7 @@
 #include "freertos/FreeRTOS.h"
 
 #include "can_tx.h"
+#include "board.h"
 
 twai_node_handle_t CAN1 = NULL;
 static const char *TAG = "cooling system";
@@ -12,6 +13,7 @@ static const char *TAG = "cooling system";
 static flow_data_t s_data;
 static portMUX_TYPE s_data_mux = portMUX_INITIALIZER_UNLOCKED; // prevents reading partial writes
 
+// writes current state of flow
 void update_flow(flow_channel_t channel, float rate_lpm, float total_vol) {
     taskENTER_CRITICAL(&s_data_mux);
     s_data.rate_lpm[channel] = rate_lpm;
@@ -19,6 +21,7 @@ void update_flow(flow_channel_t channel, float rate_lpm, float total_vol) {
     taskEXIT_CRITICAL(&s_data_mux);
 }
 
+// gets the current flow state
 void get_flow(flow_data_t *out) {
     taskENTER_CRITICAL(&s_data_mux);
     *out = s_data;
