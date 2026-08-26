@@ -45,8 +45,7 @@ void process_flow(void *arg) {
 
         int64_t now_us = esp_timer_get_time();
 
-        // publish both channels every pass, not only on an edge - a stopped channel
-        // produces no edges, so gating the publish on one froze its last rate on the bus
+        // publish channels
         for (flow_channel_t channel = FLOW_CHANNEL_1; channel <= FLOW_CHANNEL_2; channel++) {
             flow_calc_check_timeout(&flow_state[channel], now_us, TIMEOUT_US);
 
