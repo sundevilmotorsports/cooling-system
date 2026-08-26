@@ -28,6 +28,8 @@ void flow_calc_check_timeout(flow_calc_state_t *state, int64_t now_us, int64_t t
     if (state->last_edge_us == -1) {
         return; // already cold
     }
+    
+    // surpassed timeout limit
     if (now_us - state->last_edge_us > timeout_us) {
         state->last_edge_us = -1;
         state->rate_lpm = 0.0f;

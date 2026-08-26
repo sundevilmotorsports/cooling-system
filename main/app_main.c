@@ -30,6 +30,7 @@
 static flow_calc_state_t flow_state[2];
 static const float lpp = 20.0f; // pulses per liter 
 
+// processes data from queeue
 void process_flow(void *arg) {
     flow_edge_event_t event;
 
@@ -37,6 +38,10 @@ void process_flow(void *arg) {
         // block up to 100ms for an edge, so timeouts still get checked with no flow
         if (xQueueReceive(flow_sensor_get_edge_queue(), &event, pdMS_TO_TICKS(100)) == pdTRUE) {
             flow_calc_process_edge(&flow_state[event.channel], event.timestamp_us, lpp, MIN_PERIOD_US);
+            
+            // 
+            float total_vol = flow_calc_get_volume(flow_sensor_get_count(event.channel), lpp);
+            update_flow(event.channel, flow_calc_get_rate(&flow_state[event.channel]), total_vol);
         }
 
         flow_calc_check_timeout(&flow_state[0], esp_timer_get_time(), TIMEOUT_US);
