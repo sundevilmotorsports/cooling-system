@@ -80,7 +80,7 @@ void flow_sensor_init() {
 
     // glitch filter - any pulse duration shorter is treated as noise - doesnt increment counter
     pcnt_glitch_filter_config_t filter_config = {
-        .max_glitch_ns = 1000,
+        .max_glitch_ns = 1500,
     };
 
     pcnt_unit_set_glitch_filter(pcnt_unit_1, &filter_config);
