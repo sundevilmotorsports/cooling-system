@@ -56,11 +56,18 @@ void process_flow(void *arg) {
     }
 }
 
-// processes the 4 ADS1115 channels
+// processes ads channels
 void process_adc(void *arg) {
     while (1) {
         for (uint8_t channel = 0; channel < ADS1115_NUM_CHANNELS; channel++) {
-            int16_t raw = ads1115_read_channel(channel);
+            int16_t raw = 0;
+            esp_err_t err = ads1115_read_channel(channel, &raw);
+
+            if (err != ESP_OK) {
+                ESP_LOGW("adc_sampler", "channel %d read failed: %s", channel, esp_err_to_name(err));
+                continue;
+            }
+
             ESP_LOGI("adc_sampler", "channel %d: %d", channel, raw);
         }
         vTaskDelay(pdMS_TO_TICKS(ADC_ROUND_ROBIN_DELAY_MS));
@@ -68,9 +75,9 @@ void process_adc(void *arg) {
 }
 
 void app_main() {
-    can_init();
     flow_sensor_init();
     ads1115_init();
+    can_init();
 
     flow_calc_state_init(&flow_state[0]);
     flow_calc_state_init(&flow_state[1]);
