@@ -9,8 +9,11 @@
 #include "cooling_system.h"
 #include "board.h"
 
-twai_node_handle_t CAN1 = NULL;
+static twai_node_handle_t CAN1 = NULL;
 static const char *TAG = "cooling system";
+
+static volatile bool s_bus_off = false;      
+static volatile bool s_recover_pending = false; 
 
 static flow_data_t s_data;
 static portMUX_TYPE s_data_mux = portMUX_INITIALIZER_UNLOCKED; // prevents reading partial writes
@@ -45,8 +48,29 @@ static void can_tx_send(uint32_t frame_id, uint8_t *buf, size_t len) {
     }
 }
 
+// flags recovery states
+static bool IRAM_ATTR can_state_change_cb(twai_node_handle_t handle, const twai_state_change_event_data_t *edata, void *user_ctx) {
+    if (edata->new_sta == TWAI_ERROR_BUS_OFF) {
+        s_bus_off = true;
+        s_recover_pending = true;
+    } else if (edata->new_sta == TWAI_ERROR_ACTIVE) {
+        s_bus_off = false;
+    }
+    return false; 
+}
+
 // fires every FLOW cycle time - 100ms for now
 static void can_tx_timer_cb(void *arg) {
+    if (s_bus_off) {
+        // recover() restarts the 128-recessive-bit wait, so only call it once per bus-off
+        if (s_recover_pending) {
+            s_recover_pending = false;
+            ESP_LOGW(TAG, "bus-off: starting recovery");
+            twai_node_recover(CAN1);
+        }
+        return; // ensure node has time to recover
+    }
+
     // get current flow data and write
     flow_data_t data;
     get_flow(&data);
@@ -74,7 +98,7 @@ void can_init() {
     twai_onchip_node_config_t node_config = {
         .io_cfg.tx = CAN1_TX,
         .io_cfg.rx = CAN1_RX,
-        .bit_timing.bitrate = 200000,
+        .bit_timing.bitrate = 1000000,
         .tx_queue_depth = 5,
     };
 
@@ -83,6 +107,9 @@ void can_init() {
         ESP_LOGE(TAG, "Failed to create CAN node: %s", esp_err_to_name(ret));
         return;
     }
+
+    twai_event_callbacks_t cbs = { .on_state_change = can_state_change_cb };
+    ESP_ERROR_CHECK(twai_node_register_event_callbacks(CAN1, &cbs, NULL));
 
     ret = twai_node_enable(CAN1);
     if (ret != ESP_OK) {
