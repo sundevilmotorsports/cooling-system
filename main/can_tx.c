@@ -117,7 +117,7 @@ void can_init() {
         return;
     }
 
-    ESP_LOGI(TAG, "CAN initialized on TX=%d, RX=%d @ 200kbps", CAN1_TX, CAN1_RX);
+    ESP_LOGI(TAG, "CAN initialized on TX=%d, RX=%d @ 1mbps", CAN1_TX, CAN1_RX);
 
     // timer - transmit data every 100ms
     const esp_timer_create_args_t timer_args = {

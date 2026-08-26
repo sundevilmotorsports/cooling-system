@@ -1,2 +1,7 @@
 CLAUDE.md
 build
+
+sdkconfig
+sdkconfig.old
+
+.vscode
