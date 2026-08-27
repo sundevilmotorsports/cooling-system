@@ -10,7 +10,7 @@
 #include "board.h"
 
 static twai_node_handle_t CAN1 = NULL;
-static const char *TAG = "cooling system";
+static const char *TAG = "cooling_system";
 
 static volatile bool s_bus_off = false;      
 static volatile bool s_recover_pending = false; 
@@ -33,8 +33,8 @@ void get_flow(flow_data_t *out) {
     taskEXIT_CRITICAL(&s_data_mux);
 }
 
-// packs and transmits one message, static frame
-static void can_tx_send(twai_frame_t *frame, uint32_t frame_id, uint8_t *buf, size_t len) {
+// packs and transmits one message
+static void can_tx_send(twai_frame_t *frame, uint32_t frame_id, uint8_t *buf, size_t len, float rate_lpm, float total_vol) {
     frame->header.id = frame_id;
     frame->header.dlc = len;
     frame->buffer = buf;
@@ -43,6 +43,8 @@ static void can_tx_send(twai_frame_t *frame, uint32_t frame_id, uint8_t *buf, si
     esp_err_t ret = twai_node_transmit(CAN1, frame, 0);
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "TX 0x%lx failed: %s", (unsigned long)frame_id, esp_err_to_name(ret));
+    } else {
+        ESP_LOGI(TAG, "TX 0x%lx: rate=%.2f L/min, total=%.2f L", (unsigned long)frame_id, rate_lpm, total_vol);
     }
 }
 
@@ -83,14 +85,16 @@ static void can_tx_timer_cb(void *arg) {
         .total_volume_l_1 = cooling_system_flow1_total_volume_l_1_encode(data.total_volume_l[FLOW_CHANNEL_1]),
     };
     cooling_system_flow1_pack(s_buf1, &flow1, sizeof(s_buf1));
-    can_tx_send(&s_frame1, COOLING_SYSTEM_FLOW1_FRAME_ID, s_buf1, sizeof(s_buf1));
+    can_tx_send(&s_frame1, COOLING_SYSTEM_FLOW1_FRAME_ID, s_buf1, sizeof(s_buf1),
+                data.rate_lpm[FLOW_CHANNEL_1], data.total_volume_l[FLOW_CHANNEL_1]);
 
     struct cooling_system_flow2_t flow2 = {
         .rate_lpm_2 = cooling_system_flow2_rate_lpm_2_encode(data.rate_lpm[FLOW_CHANNEL_2]),
         .total_volume_l_2 = cooling_system_flow2_total_volume_l_2_encode(data.total_volume_l[FLOW_CHANNEL_2]),
     };
     cooling_system_flow2_pack(s_buf2, &flow2, sizeof(s_buf2));
-    can_tx_send(&s_frame2, COOLING_SYSTEM_FLOW2_FRAME_ID, s_buf2, sizeof(s_buf2));
+    can_tx_send(&s_frame2, COOLING_SYSTEM_FLOW2_FRAME_ID, s_buf2, sizeof(s_buf2),
+                data.rate_lpm[FLOW_CHANNEL_2], data.total_volume_l[FLOW_CHANNEL_2]);
 }
 
 // initializes twai can node
