@@ -33,16 +33,14 @@ void get_flow(flow_data_t *out) {
     taskEXIT_CRITICAL(&s_data_mux);
 }
 
-// packs and transmits one message
-static void can_tx_send(uint32_t frame_id, uint8_t *buf, size_t len) {
-    twai_frame_t frame = {
-        .header.id = frame_id,
-        .header.dlc = len,
-        .buffer = buf,
-        .buffer_len = len,
-    };
+// packs and transmits one message, static frame
+static void can_tx_send(twai_frame_t *frame, uint32_t frame_id, uint8_t *buf, size_t len) {
+    frame->header.id = frame_id;
+    frame->header.dlc = len;
+    frame->buffer = buf;
+    frame->buffer_len = len;
 
-    esp_err_t ret = twai_node_transmit(CAN1, &frame, 0);
+    esp_err_t ret = twai_node_transmit(CAN1, frame, 0);
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "TX 0x%lx failed: %s", (unsigned long)frame_id, esp_err_to_name(ret));
     }
@@ -76,21 +74,23 @@ static void can_tx_timer_cb(void *arg) {
     get_flow(&data);
 
     // create CAN structs, pack into buffers, and transmit
+    static twai_frame_t s_frame1, s_frame2;
+    static uint8_t s_buf1[COOLING_SYSTEM_FLOW1_LENGTH];
+    static uint8_t s_buf2[COOLING_SYSTEM_FLOW2_LENGTH];
+
     struct cooling_system_flow1_t flow1 = {
         .rate_lpm_1 = cooling_system_flow1_rate_lpm_1_encode(data.rate_lpm[FLOW_CHANNEL_1]),
         .total_volume_l_1 = cooling_system_flow1_total_volume_l_1_encode(data.total_volume_l[FLOW_CHANNEL_1]),
     };
-    uint8_t buf1[COOLING_SYSTEM_FLOW1_LENGTH];
-    cooling_system_flow1_pack(buf1, &flow1, sizeof(buf1));
-    can_tx_send(COOLING_SYSTEM_FLOW1_FRAME_ID, buf1, sizeof(buf1));
+    cooling_system_flow1_pack(s_buf1, &flow1, sizeof(s_buf1));
+    can_tx_send(&s_frame1, COOLING_SYSTEM_FLOW1_FRAME_ID, s_buf1, sizeof(s_buf1));
 
     struct cooling_system_flow2_t flow2 = {
         .rate_lpm_2 = cooling_system_flow2_rate_lpm_2_encode(data.rate_lpm[FLOW_CHANNEL_2]),
         .total_volume_l_2 = cooling_system_flow2_total_volume_l_2_encode(data.total_volume_l[FLOW_CHANNEL_2]),
     };
-    uint8_t buf2[COOLING_SYSTEM_FLOW2_LENGTH];
-    cooling_system_flow2_pack(buf2, &flow2, sizeof(buf2));
-    can_tx_send(COOLING_SYSTEM_FLOW2_FRAME_ID, buf2, sizeof(buf2));
+    cooling_system_flow2_pack(s_buf2, &flow2, sizeof(s_buf2));
+    can_tx_send(&s_frame2, COOLING_SYSTEM_FLOW2_FRAME_ID, s_buf2, sizeof(s_buf2));
 }
 
 // initializes twai can node
@@ -98,6 +98,8 @@ void can_init() {
     twai_onchip_node_config_t node_config = {
         .io_cfg.tx = CAN1_TX,
         .io_cfg.rx = CAN1_RX,
+        .io_cfg.quanta_clk_out = -1, 
+        .io_cfg.bus_off_indicator = -1,
         .bit_timing.bitrate = 1000000,
         .tx_queue_depth = 5,
     };
