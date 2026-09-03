@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -21,17 +22,18 @@
 #include "flow_sensor.h"
 #include "flow_calc.h"
 #include "ads1115.h"
+#include "temp_calc.h"
 
 #define STACK_SIZE 4096
 #define FLOW_PROCESSOR_PRIORITY 5
 #define ADC_SAMPLER_PRIORITY 4
-#define MIN_PERIOD_US (int64_t)15000
+#define MIN_PERIOD_US (int64_t)1000
 #define TIMEOUT_US (int64_t)(3 * 1e6) // 3 seconds
 #define ADC_ROUND_ROBIN_DELAY_MS 500
 
 // calculation state for each channel
 static flow_calc_state_t flow_state[2];
-static const float lpp = 20.0f; // pulses per liter 
+static const float lpp = 390.0f; // pulses per liter
 
 // processes data from queue
 void process_flow(void *arg) {
@@ -67,8 +69,20 @@ void process_adc(void *arg) {
                 ESP_LOGW("adc_sampler", "channel %d read failed: %s", channel, esp_err_to_name(err));
                 continue;
             }
+            
+            //test logging
+            float volts = temp_calc_volts(raw);
+            float ohms = temp_calc_ntc_ohms(volts, TEMP_CALC_R_BIAS_OHMS, TEMP_CALC_V_SUPPLY);
+            float temp_c = temp_calc_ntc_c(ohms);
 
-            ESP_LOGI("adc_sampler", "channel %d: %d", channel, raw);
+            if (isnan(temp_c)) {
+                const char *why = isnan(ohms) ? (volts > 0.0f ? "open" : "short") : "off-curve";
+                ESP_LOGW("adc_sampler", "ch%d: %d counts  %.3f V  %s", channel, raw, volts, why);
+                continue;
+            }
+
+            ESP_LOGI("adc_sampler", "ch%d: %d counts  %.3f V  %.1f ohm  %.2f C",
+                     channel, raw, volts, ohms, temp_c);
         }
         vTaskDelay(pdMS_TO_TICKS(ADC_ROUND_ROBIN_DELAY_MS));
     }
