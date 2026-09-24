@@ -43,9 +43,10 @@ static void can_tx_send(twai_frame_t *frame, uint32_t frame_id, uint8_t *buf, si
     esp_err_t ret = twai_node_transmit(CAN1, frame, 0);
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "TX 0x%lx failed: %s", (unsigned long)frame_id, esp_err_to_name(ret));
-    } else {
-        ESP_LOGI(TAG, "TX 0x%lx: rate=%.2f L/min, total=%.2f L", (unsigned long)frame_id, rate_lpm, total_vol);
     }
+    // ESP_LOGI(TAG, "TX 0x%lx: rate=%.2f L/min, total=%.2f L", (unsigned long)frame_id, rate_lpm, total_vol);
+    (void)rate_lpm;
+    (void)total_vol;
 }
 
 // flags recovery states

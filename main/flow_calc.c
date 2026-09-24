@@ -20,7 +20,8 @@ void flow_calc_process_edge(flow_calc_state_t *state, int64_t timestamp_us, floa
     }
 
     // period (us/pulse), pulses/min, L/min
-    state->rate_lpm = 6e7f / (float)period_us / k_factor;
+    // same as frequency / 6.5: 1e6 microseconds (1 second) / period / (390 / 60)
+    state->rate_lpm = 6e7f / (float)period_us / k_factor; 
     state->last_edge_us = timestamp_us;
 }
 

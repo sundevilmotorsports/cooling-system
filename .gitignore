@@ -1,4 +1,3 @@
-CLAUDE.md
 build
 
 sdkconfig
@@ -6,3 +5,6 @@ sdkconfig.old
 
 .vscode
 test
+
+CODEX.md
+AGENTS.md

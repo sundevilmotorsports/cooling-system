@@ -1,5 +1,9 @@
+#include <stdbool.h>
+
+#include "driver/gpio.h"
 #include "driver/i2c_master.h"
 #include "esp_log.h"
+#include "esp_rom_sys.h"
 #include "esp_timer.h"
 
 #include "freertos/FreeRTOS.h"
@@ -30,7 +34,41 @@ static const char *TAG = "ads1115";
 static i2c_master_bus_handle_t s_bus = NULL;
 static i2c_master_dev_handle_t s_dev = NULL;
 
+static void i2c_pin_check(void) {
+    gpio_config_t cfg = {
+        .pin_bit_mask = (1ULL << I2C_SDA_GPIO) | (1ULL << I2C_SCL_GPIO),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+    };
+    ESP_ERROR_CHECK(gpio_config(&cfg));
+    esp_rom_delay_us(1000);
+    int sda = gpio_get_level(I2C_SDA_GPIO), scl = gpio_get_level(I2C_SCL_GPIO);
+
+    // internal pull-up proves the pin itself can be driven high
+    cfg.pull_up_en = GPIO_PULLUP_ENABLE;
+    ESP_ERROR_CHECK(gpio_config(&cfg));
+    esp_rom_delay_us(1000);
+    int sda_pu = gpio_get_level(I2C_SDA_GPIO), scl_pu = gpio_get_level(I2C_SCL_GPIO);
+
+    // hand the pins back floating for the i2c driver
+    cfg.pull_up_en = GPIO_PULLUP_DISABLE;
+    ESP_ERROR_CHECK(gpio_config(&cfg));
+
+    ESP_LOGI(TAG, "pins: idle SDA=%d SCL=%d | int pullup SDA=%d SCL=%d",
+             sda, scl, sda_pu, scl_pu);
+    if (sda && scl) {
+        ESP_LOGI(TAG, "external pullups alive - rail is up, device is not answering");
+    } else if (sda_pu && scl_pu) {
+        ESP_LOGE(TAG, "lines float low - +3.3VA dead or pullups not connected to the bus");
+    } else {
+        ESP_LOGE(TAG, "line held low even by internal pullup - short to GND or wrong pin");
+    }
+}
+
 void ads1115_init(void) {
+    i2c_pin_check();
+
     i2c_master_bus_config_t bus_cfg = {
         .i2c_port = -1,
         .sda_io_num = I2C_SDA_GPIO,
@@ -49,6 +87,20 @@ void ads1115_init(void) {
     ESP_ERROR_CHECK(i2c_master_bus_add_device(s_bus, &dev_cfg, &s_dev));
 
     ESP_LOGI(TAG, "ADS1115 init on SDA=%d, SCL=%d", I2C_SDA_GPIO, I2C_SCL_GPIO);
+
+    // check i2c
+    bool found = false;
+    esp_log_level_set("i2c.master", ESP_LOG_NONE); // a dead bus times out 112 times
+    for (uint8_t addr = 0x08; addr < 0x78; addr++) {
+        if (i2c_master_probe(s_bus, addr, 20) == ESP_OK) {
+            ESP_LOGI(TAG, "i2c device at 0x%02X", addr);
+            found = true;
+        }
+    }
+    esp_log_level_set("i2c.master", ESP_LOG_INFO);
+    if (!found) {
+        ESP_LOGE(TAG, "i2c bus empty - check +3.3VA rail and SDA/SCL idle high");
+    }
 }
 
 esp_err_t ads1115_read_channel(uint8_t channel, int16_t *out) {
