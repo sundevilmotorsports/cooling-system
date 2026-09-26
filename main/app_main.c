@@ -39,7 +39,6 @@ static const float lpp = 390.0f; // pulses per liter
 // processes data from queue
 void process_flow(void *arg) {
     flow_edge_event_t event;
-    uint32_t queued_edges[2] = {0, 0};
     int counts[2] = {0, 0};
     float rates[2] = {0.0f, 0.0f};
     float volumes[2] = {0.0f, 0.0f};
@@ -48,7 +47,6 @@ void process_flow(void *arg) {
     while (1) {
         // block up to 100ms for an edge, so timeouts still get checked with no flow
         if (xQueueReceive(flow_sensor_get_edge_queue(), &event, pdMS_TO_TICKS(100)) == pdTRUE) {
-            queued_edges[event.channel]++;
             flow_calc_process_edge(&flow_state[event.channel], event.timestamp_us, lpp, MIN_PERIOD_US);
         }
 
@@ -65,14 +63,11 @@ void process_flow(void *arg) {
             update_flow(channel, rates[channel], volumes[channel]);
         }
 
-        // Log from the task, never the ISR: queue edges show GPIO reception;
-        // PCNT counts independently show the pulses used for total volume.
+        // Log from the task, never the ISR. PCNT counts the pulses used for total volume.
         if (now_us >= next_log_us) {
-            for (flow_channel_t channel = FLOW_CHANNEL_1; channel <= FLOW_CHANNEL_2; channel++) {
-                ESP_LOGI("flow", "ch%d: queue=%lu PCNT=%d rate=%.2f L/min total=%.3f L",
-                         channel + 1, (unsigned long)queued_edges[channel], counts[channel],
-                         rates[channel], volumes[channel]);
-            }
+            flow_channel_t channel = FLOW_CHANNEL_1;
+            ESP_LOGI("flow", "ch%d: PCNT=%d rate=%.2f L/min total=%.3f L",
+                     channel + 1, counts[channel], rates[channel], volumes[channel]);
             next_log_us = now_us + FLOW_LOG_INTERVAL_US;
         }
     }
