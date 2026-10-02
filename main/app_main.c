@@ -10,7 +10,6 @@
 #include "esp_twai_types.h"
 
 #include "driver/gpio.h"
-// #include "driver/i2c_master.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -21,15 +20,15 @@
 #include "can_tx.h"
 #include "flow_sensor.h"
 #include "flow_calc.h"
-// #include "ads1115.h" 
-// #include "temp_calc.h" 
+#include "ads1115.h"
+#include "temp_calc.h"
 
 #define STACK_SIZE 4096
 #define FLOW_PROCESSOR_PRIORITY 5
-// #define ADC_SAMPLER_PRIORITY 4 
+#define ADC_SAMPLER_PRIORITY 4
 #define MIN_PERIOD_US (int64_t)1000
 #define TIMEOUT_US (int64_t)(3 * 1e6) // 3 seconds
-// #define ADC_ROUND_ROBIN_DELAY_MS 500 
+#define ADC_ROUND_ROBIN_DELAY_MS 500
 #define FLOW_LOG_INTERVAL_US INT64_C(1000000) // 1 second
 
 // calculation state for each channel
@@ -73,39 +72,25 @@ void process_flow(void *arg) {
     }
 }
 
-// processes ads channels
-// void process_adc(void *arg) {
-//     while (1) {
-//         for (uint8_t channel = 0; channel < ADS1115_NUM_CHANNELS; channel++) {
-//             int16_t raw = 0;
-//             esp_err_t err = ads1115_read_channel(channel, &raw);
-
-//             if (err != ESP_OK) {
-//                 ESP_LOGW("adc_sampler", "channel %d read failed: %s", channel, esp_err_to_name(err));
-//                 continue;
-//             }
-            
-//             //test logging
-//             float volts = temp_calc_volts(raw);
-//             float ohms = temp_calc_ntc_ohms(volts, TEMP_CALC_R_BIAS_OHMS, TEMP_CALC_V_SUPPLY);
-//             float temp_c = temp_calc_ntc_c(ohms);
-
-//             if (isnan(temp_c)) {
-//                 const char *why = isnan(ohms) ? (volts > 0.0f ? "open" : "short") : "off-curve";
-//                 ESP_LOGW("adc_sampler", "ch%d: %d counts  %.3f V  %s", channel, raw, volts, why);
-//                 continue;
-//             }
-
-//             ESP_LOGI("adc_sampler", "ch%d: %d counts  %.3f V  %.1f ohm  %.2f C",
-//                      channel, raw, volts, ohms, temp_c);
-//         }
-//         vTaskDelay(pdMS_TO_TICKS(ADC_ROUND_ROBIN_DELAY_MS));
-//     }
-// }
+// verifies voltage readings - no temperature processing yet
+void process_adc(void *arg) {
+    while (1) {
+        for (uint8_t channel = 0; channel < ADS1115_NUM_CHANNELS; channel++) {
+            int16_t raw = 0;
+            esp_err_t err = ads1115_read_channel(channel, &raw);
+            if (err != ESP_OK) {
+                ESP_LOGW("adc_sampler", "ch%d read failed: %s", channel, esp_err_to_name(err));
+                continue;
+            }
+            ESP_LOGI("adc_sampler", "ch%d: %d counts, %.3f V", channel, raw, temp_calc_volts(raw));
+        }
+        vTaskDelay(pdMS_TO_TICKS(ADC_ROUND_ROBIN_DELAY_MS));
+    }
+}
 
 void app_main() {
     flow_sensor_init();
-    // ads1115_init(); 
+    ads1115_init();
     can_init();   
 
     flow_calc_state_init(&flow_state[0]);
@@ -113,5 +98,5 @@ void app_main() {
 
     // create tasks
     xTaskCreate(process_flow, "flow_processor", STACK_SIZE, NULL, FLOW_PROCESSOR_PRIORITY, NULL);
-    // xTaskCreate(process_adc, "adc_sampler", STACK_SIZE, NULL, ADC_SAMPLER_PRIORITY, NULL);
+    xTaskCreate(process_adc, "adc_sampler", STACK_SIZE, NULL, ADC_SAMPLER_PRIORITY, NULL);
 }

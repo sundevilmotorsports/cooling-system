@@ -1,5 +1,3 @@
-#include <stdbool.h>
-
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"
 #include "esp_log.h"
@@ -57,13 +55,11 @@ static void i2c_pin_check(void) {
 
     ESP_LOGI(TAG, "pins: idle SDA=%d SCL=%d | int pullup SDA=%d SCL=%d",
              sda, scl, sda_pu, scl_pu);
-    if (sda && scl) {
-        ESP_LOGI(TAG, "external pullups alive - rail is up, device is not answering");
-    } else if (sda_pu && scl_pu) {
-        ESP_LOGE(TAG, "lines float low - +3.3VA dead or pullups not connected to the bus");
-    } else {
-        ESP_LOGE(TAG, "line held low even by internal pullup - short to GND or wrong pin");
-    }
+    if (sda && scl) ESP_LOGI(TAG, "both lines idle high on external pullups");
+    if (!scl && scl_pu) ESP_LOGW(TAG, "SCL floats low without internal pullup; check external pullup and continuity to ADS1115");
+    else if (!scl_pu) ESP_LOGE(TAG, "SCL stays low with internal pullup; check for a short or wrong GPIO");
+    if (!sda && sda_pu) ESP_LOGW(TAG, "SDA floats low without internal pullup; check external pullup and continuity to ADS1115");
+    else if (!sda_pu) ESP_LOGE(TAG, "SDA stays low with internal pullup; check for a short or wrong GPIO");
 }
 
 void ads1115_init(void) {
@@ -88,18 +84,11 @@ void ads1115_init(void) {
 
     ESP_LOGI(TAG, "ADS1115 init on SDA=%d, SCL=%d", I2C_SDA_GPIO, I2C_SCL_GPIO);
 
-    // check i2c
-    bool found = false;
-    esp_log_level_set("i2c.master", ESP_LOG_NONE); // a dead bus times out 112 times
-    for (uint8_t addr = 0x08; addr < 0x78; addr++) {
-        if (i2c_master_probe(s_bus, addr, 20) == ESP_OK) {
-            ESP_LOGI(TAG, "i2c device at 0x%02X", addr);
-            found = true;
-        }
-    }
-    esp_log_level_set("i2c.master", ESP_LOG_INFO);
-    if (!found) {
-        ESP_LOGE(TAG, "i2c bus empty - check +3.3VA rail and SDA/SCL idle high");
+    esp_err_t err = i2c_master_probe(s_bus, ADS1115_ADDR, 20);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "ADS1115 acknowledged at 0x%02X", ADS1115_ADDR);
+    } else {
+        ESP_LOGE(TAG, "no ACK from ADS1115 at 0x%02X: %s", ADS1115_ADDR, esp_err_to_name(err));
     }
 }
 
