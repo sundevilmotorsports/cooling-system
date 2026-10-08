@@ -5,7 +5,12 @@ sdkconfig.old
 
 .vscode
 test/*
-!test/check_can_tx.sh
 
 CODEX.md
 AGENTS.md
+
+dbc/check_logger_config.py
+.codex
+
+requirements.txt
+test*.txt
