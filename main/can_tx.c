@@ -181,11 +181,13 @@ void can_init() {
 
     ESP_LOGI(TAG, "CAN initialized on TX=%d, RX=%d @ 1mbps", CAN1_TX, CAN1_RX);
 
-    // timer - transmit data every 100ms
+    // register function
     const esp_timer_create_args_t timer_args = {
         .callback = can_tx_timer_cb,
         .name = "can_tx",
     };
+
+    // fires every 100 ms
     esp_timer_handle_t timer = NULL;
     ESP_ERROR_CHECK(esp_timer_create(&timer_args, &timer));
     ESP_ERROR_CHECK(esp_timer_start_periodic(timer, COOLING_SYSTEM_FLOW1_CYCLE_TIME_MS * 1000ULL));
