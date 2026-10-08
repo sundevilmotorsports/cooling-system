@@ -4,7 +4,8 @@ sdkconfig
 sdkconfig.old
 
 .vscode
-test
+test/*
+!test/check_can_tx.sh
 
 CODEX.md
 AGENTS.md

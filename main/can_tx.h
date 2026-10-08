@@ -14,6 +14,9 @@ void can_init();
 // called by flow_processor after each update
 void update_flow(flow_channel_t channel, float rate_lpm, float total_volume_l);
 
+// NAN invalidates a channel and suppresses the complete TEMP frame
+void update_temp(uint8_t channel, float temp_c);
+
 // called by can_tx task to get a coherent copy before encoding
 void get_flow(flow_data_t *out);
 

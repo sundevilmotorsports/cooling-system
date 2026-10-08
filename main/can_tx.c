@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "esp_twai.h"
 #include "esp_twai_onchip.h"
 #include "esp_twai_types.h"
@@ -16,6 +18,7 @@ static volatile bool s_bus_off = false;
 static volatile bool s_recover_pending = false; 
 
 static flow_data_t s_data;
+static float s_temp_c[4] = {NAN, NAN, NAN, NAN};
 static portMUX_TYPE s_data_mux = portMUX_INITIALIZER_UNLOCKED; // prevents reading partial writes
 
 // writes current state of flow
@@ -33,8 +36,18 @@ void get_flow(flow_data_t *out) {
     taskEXIT_CRITICAL(&s_data_mux);
 }
 
+// writes temp state
+void update_temp(uint8_t channel, float temp_c) {
+    if (channel >= 4) {
+        return;
+    }
+    taskENTER_CRITICAL(&s_data_mux);
+    s_temp_c[channel] = temp_c;
+    taskEXIT_CRITICAL(&s_data_mux);
+}
+
 // packs and transmits one message
-static void can_tx_send(twai_frame_t *frame, uint32_t frame_id, uint8_t *buf, size_t len, float rate_lpm, float total_vol) {
+static void can_tx_send(twai_frame_t *frame, uint32_t frame_id, uint8_t *buf, size_t len) {
     frame->header.id = frame_id;
     frame->header.dlc = len;
     frame->buffer = buf;
@@ -44,9 +57,6 @@ static void can_tx_send(twai_frame_t *frame, uint32_t frame_id, uint8_t *buf, si
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "TX 0x%lx failed: %s", (unsigned long)frame_id, esp_err_to_name(ret));
     }
-    // ESP_LOGI(TAG, "TX 0x%lx: rate=%.2f L/min, total=%.2f L", (unsigned long)frame_id, rate_lpm, total_vol);
-    (void)rate_lpm;
-    (void)total_vol;
 }
 
 // flags recovery states
@@ -86,16 +96,61 @@ static void can_tx_timer_cb(void *arg) {
         .total_volume_l_1 = cooling_system_flow1_total_volume_l_1_encode(data.total_volume_l[FLOW_CHANNEL_1]),
     };
     cooling_system_flow1_pack(s_buf1, &flow1, sizeof(s_buf1));
-    can_tx_send(&s_frame1, COOLING_SYSTEM_FLOW1_FRAME_ID, s_buf1, sizeof(s_buf1),
-                data.rate_lpm[FLOW_CHANNEL_1], data.total_volume_l[FLOW_CHANNEL_1]);
+    can_tx_send(&s_frame1, COOLING_SYSTEM_FLOW1_FRAME_ID, s_buf1, sizeof(s_buf1));
 
     struct cooling_system_flow2_t flow2 = {
         .rate_lpm_2 = cooling_system_flow2_rate_lpm_2_encode(data.rate_lpm[FLOW_CHANNEL_2]),
         .total_volume_l_2 = cooling_system_flow2_total_volume_l_2_encode(data.total_volume_l[FLOW_CHANNEL_2]),
     };
+
+    // transmit flow
     cooling_system_flow2_pack(s_buf2, &flow2, sizeof(s_buf2));
-    can_tx_send(&s_frame2, COOLING_SYSTEM_FLOW2_FRAME_ID, s_buf2, sizeof(s_buf2),
-                data.rate_lpm[FLOW_CHANNEL_2], data.total_volume_l[FLOW_CHANNEL_2]);
+    can_tx_send(&s_frame2, COOLING_SYSTEM_FLOW2_FRAME_ID, s_buf2, sizeof(s_buf2));
+
+    // timing
+    static int64_t next_temp_tx_us = 0;
+    int64_t now_us = esp_timer_get_time();
+    if (now_us < next_temp_tx_us) {
+        return;
+    }
+    next_temp_tx_us = now_us + COOLING_SYSTEM_TEMP_CYCLE_TIME_MS * 1000ULL;
+
+    // lock and copy all four readings
+    float temp_c[4];
+    taskENTER_CRITICAL(&s_data_mux);
+    for (int channel = 0; channel < 4; channel++) {
+        temp_c[channel] = s_temp_c[channel];
+    }
+    taskEXIT_CRITICAL(&s_data_mux);
+
+    // suppress all temperatures on any fault
+    for (int channel = 0; channel < 4; channel++) {
+        if (!isfinite(temp_c[channel])) {
+            return;
+        }
+    }
+
+    // validates range
+    if (!cooling_system_temp_temp_c_1_is_in_phys_range(temp_c[0]) ||
+        !cooling_system_temp_temp_c_2_is_in_phys_range(temp_c[1]) ||
+        !cooling_system_temp_temp_c_3_is_in_phys_range(temp_c[2]) ||
+        !cooling_system_temp_temp_c_4_is_in_phys_range(temp_c[3])) {
+        return;
+    }
+
+    // twai frame - scale and pack into struct
+    static twai_frame_t s_temp_frame;
+    static uint8_t s_temp_buf[COOLING_SYSTEM_TEMP_LENGTH];
+    struct cooling_system_temp_t temp = {
+        .temp_c_1 = cooling_system_temp_temp_c_1_encode(temp_c[0]),
+        .temp_c_2 = cooling_system_temp_temp_c_2_encode(temp_c[1]),
+        .temp_c_3 = cooling_system_temp_temp_c_3_encode(temp_c[2]),
+        .temp_c_4 = cooling_system_temp_temp_c_4_encode(temp_c[3]),
+    };
+
+    // pack and send
+    cooling_system_temp_pack(s_temp_buf, &temp, sizeof(s_temp_buf));
+    can_tx_send(&s_temp_frame, COOLING_SYSTEM_TEMP_FRAME_ID, s_temp_buf, sizeof(s_temp_buf));
 }
 
 // initializes twai can node
