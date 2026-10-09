@@ -7,6 +7,7 @@
 #include "freertos/queue.h"
 
 #define FLOW_EDGE_QUEUE_LEN 32
+#define FLOW_MIN_PERIOD_US INT64_C(1000)
 
 // two channels
 typedef enum {
@@ -20,15 +21,11 @@ typedef struct {
     int64_t timestamp_us;
 } flow_edge_event_t;
 
-// initialize pcnt units
-void flow_sensor_init();
+// initialize rising-edge interrupts and timestamp queue
+void flow_sensor_init(void);
 
-// raw PCNT totalizer count for a channel
+// accepted pulse total, independent of timestamp queue capacity
 int flow_sensor_get_count(flow_channel_t channel);
-
-// gets amount of times the pcnt unit has surpassed the limit
-// extra since unit config has this enabled, but can verify with this
-uint32_t flow_sensor_get_overflow_count(flow_channel_t channel);
 
 // timestamp queue one entry per pulse edge
 QueueHandle_t flow_sensor_get_edge_queue(void);

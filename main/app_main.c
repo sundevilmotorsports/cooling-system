@@ -26,7 +26,6 @@
 #define STACK_SIZE 4096
 #define FLOW_PROCESSOR_PRIORITY 5
 #define ADC_SAMPLER_PRIORITY 4
-#define MIN_PERIOD_US (int64_t)1000
 #define TIMEOUT_US (int64_t)(3 * 1e6) // 3 seconds
 #define ADC_ROUND_ROBIN_DELAY_MS 500
 #define FLOW_LOG_INTERVAL_US INT64_C(1000000) // 1 second
@@ -46,7 +45,7 @@ void process_flow(void *arg) {
     while (1) {
         // block up to 100ms for an edge, so timeouts still get checked with no flow
         if (xQueueReceive(flow_sensor_get_edge_queue(), &event, pdMS_TO_TICKS(100)) == pdTRUE) {
-            flow_calc_process_edge(&flow_state[event.channel], event.timestamp_us, lpp, MIN_PERIOD_US);
+            flow_calc_process_edge(&flow_state[event.channel], event.timestamp_us, lpp, FLOW_MIN_PERIOD_US);
         }
 
         int64_t now_us = esp_timer_get_time();
@@ -55,17 +54,16 @@ void process_flow(void *arg) {
         for (flow_channel_t channel = FLOW_CHANNEL_1; channel <= FLOW_CHANNEL_2; channel++) {
             flow_calc_check_timeout(&flow_state[channel], now_us, TIMEOUT_US);
 
-            // flow_sensor_get_count() includes overflow accumulation
             counts[channel] = flow_sensor_get_count(channel);
             rates[channel] = flow_calc_get_rate(&flow_state[channel]);
             volumes[channel] = flow_calc_get_volume(counts[channel], lpp);
             update_flow(channel, rates[channel], volumes[channel]);
         }
 
-        // Log from the task, never the ISR. PCNT counts the pulses used for total volume.
+        // Log from the task, never the ISR.
         if (now_us >= next_log_us) {
             flow_channel_t channel = FLOW_CHANNEL_1;
-            ESP_LOGI("flow", "ch%d: PCNT=%d rate=%.2f L/min total=%.3f L",
+            ESP_LOGI("flow", "ch%d: pulses=%d rate=%.2f L/min total=%.3f L",
                      channel + 1, counts[channel], rates[channel], volumes[channel]);
             next_log_us = now_us + FLOW_LOG_INTERVAL_US;
         }
