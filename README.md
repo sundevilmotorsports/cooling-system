@@ -68,7 +68,8 @@ Git-ignored local files and must be supplied separately for a fresh clone.
   per bus-off event. Keep generated `cooling_system.c/h` unchanged by hand.
 
 USB logs: `flow` reports **channel 1 only**, once per second (`pulses`, L/min,
-L); `adc_sampler` reports channels 0–3 with counts/volts/°C or warnings;
+L); `adc_sampler` displays **Analog1/2 only**, with counts/volts/°C or warnings
+(all four channels are still sampled and published);
 `ads1115` reports pin/ACK checks; `cooling_system` reports CAN startup/failures.
 Successful transmissions are not printed. Verify channel 2 at the receiver.
 

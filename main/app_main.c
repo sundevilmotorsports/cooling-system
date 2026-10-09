@@ -78,17 +78,22 @@ void process_adc(void *arg) {
             esp_err_t err = ads1115_read_channel(channel, &raw);
             if (err != ESP_OK) {
                 update_temp(channel, NAN);
-                ESP_LOGW("adc_sampler", "ch%d read failed: %s", channel, esp_err_to_name(err));
+                if (channel < 2) {
+                    ESP_LOGW("adc_sampler", "Analog%d read failed: %s", channel + 1, esp_err_to_name(err));
+                }
                 continue;
             }
             float volts = temp_calc_volts(raw);
             float ohms = temp_calc_ntc_ohms(volts, TEMP_CALC_R_BIAS_OHMS, TEMP_CALC_V_SUPPLY);
             float temp_c = temp_calc_ntc_c(ohms);
             update_temp(channel, temp_c);
+            if (channel >= 2) {
+                continue;
+            }
             if (isfinite(temp_c)) {
-                ESP_LOGI("adc_sampler", "ch%d: %d counts, %.3f V, %.2f C", channel, raw, volts, temp_c);
+                ESP_LOGI("adc_sampler", "Analog%d: %d counts, %.3f V, %.2f C", channel + 1, raw, volts, temp_c);
             } else {
-                ESP_LOGW("adc_sampler", "ch%d: invalid NTC reading (%d counts, %.3f V)", channel, raw, volts);
+                ESP_LOGW("adc_sampler", "Analog%d: invalid NTC reading (%d counts, %.3f V)", channel + 1, raw, volts);
             }
         }
         vTaskDelay(pdMS_TO_TICKS(ADC_ROUND_ROBIN_DELAY_MS));
