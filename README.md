@@ -1,3 +1,5 @@
-# cooling-system
+# coolant-system
 
-firmware for coolant flow
+firmware for engine coolant monitoring system
+
+main branch is configured s3
