@@ -83,12 +83,12 @@ void flow_sensor_init() {
         .max_glitch_ns = 1500,
     };
 
-    pcnt_unit_set_glitch_filter(pcnt_unit_1, &filter_config);
-    pcnt_unit_set_glitch_filter(pcnt_unit_2, &filter_config);
+    ESP_ERROR_CHECK(pcnt_unit_set_glitch_filter(pcnt_unit_1, &filter_config));
+    ESP_ERROR_CHECK(pcnt_unit_set_glitch_filter(pcnt_unit_2, &filter_config));
 
     // set actions on edge - counter increases on rising edge, holds on falling edge
-    pcnt_channel_set_edge_action(pcnt_chan_1, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_HOLD);
-    pcnt_channel_set_edge_action(pcnt_chan_2, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_HOLD);
+    ESP_ERROR_CHECK(pcnt_channel_set_edge_action(pcnt_chan_1, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_HOLD));
+    ESP_ERROR_CHECK(pcnt_channel_set_edge_action(pcnt_chan_2, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_HOLD));
 
     // watch points to track when pulse count surpasses limits
     // little bit extra since flag_accum_count is enabled, but can use to verify overflow amount is correct
@@ -105,16 +105,17 @@ void flow_sensor_init() {
     ESP_ERROR_CHECK(pcnt_unit_register_event_callbacks(pcnt_unit_2, &watch_cbs, (void *)FLOW_CHANNEL_2));
 
     // enable and start units
-    pcnt_unit_enable(pcnt_unit_1);
-    pcnt_unit_clear_count(pcnt_unit_1);
-    pcnt_unit_start(pcnt_unit_1);
+    ESP_ERROR_CHECK(pcnt_unit_enable(pcnt_unit_1));
+    ESP_ERROR_CHECK(pcnt_unit_clear_count(pcnt_unit_1));
+    ESP_ERROR_CHECK(pcnt_unit_start(pcnt_unit_1));
 
-    pcnt_unit_enable(pcnt_unit_2);
-    pcnt_unit_clear_count(pcnt_unit_2);
-    pcnt_unit_start(pcnt_unit_2);
+    ESP_ERROR_CHECK(pcnt_unit_enable(pcnt_unit_2));
+    ESP_ERROR_CHECK(pcnt_unit_clear_count(pcnt_unit_2));
+    ESP_ERROR_CHECK(pcnt_unit_start(pcnt_unit_2));
 
     // edge timestamp queue
     s_edge_queue = xQueueCreate(FLOW_EDGE_QUEUE_LEN, sizeof(flow_edge_event_t));
+    configASSERT(s_edge_queue != NULL);
 
     gpio_config_t flow_gpio_cfg = {
         .pin_bit_mask = (1ULL << FLOW1_GPIO) | (1ULL << FLOW2_GPIO),

@@ -64,7 +64,7 @@ void get_flow(flow_data_t *out) {
     taskEXIT_CRITICAL(&s_data_mux);
 }
 
-// writes temp state
+// writes temp state, invalid reading reuses previous state
 void update_temp(uint8_t channel, float temp_c) {
     if (channel >= 4 || !isfinite(temp_c) || temp_c < -40.0f || temp_c > 200.0f) {
         return;
@@ -160,7 +160,7 @@ static void can_tx_timer_cb(void *arg) {
     }
     taskEXIT_CRITICAL(&s_data_mux);
 
-    // suppress all temperatures on any fault
+    // wait until every channel has supplied a valid reading
     for (int channel = 0; channel < 4; channel++) {
         if (!isfinite(temp_c[channel])) {
             return;

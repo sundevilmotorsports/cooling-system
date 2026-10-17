@@ -5,6 +5,8 @@ sdkconfig.old
 
 .vscode
 test/*
+!test/check_can_tx.sh
+!test/check_pcnt_flow.sh
 
 CODEX.md
 AGENTS.md
