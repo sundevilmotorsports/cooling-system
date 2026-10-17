@@ -66,7 +66,7 @@ void get_flow(flow_data_t *out) {
 
 // writes temp state
 void update_temp(uint8_t channel, float temp_c) {
-    if (channel >= 4) {
+    if (channel >= 4 || !isfinite(temp_c) || temp_c < -40.0f || temp_c > 200.0f) {
         return;
     }
     taskENTER_CRITICAL(&s_data_mux);
